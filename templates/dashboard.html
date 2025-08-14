@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Expense Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        h1,
+        h2 {
+            color: #333;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 50%;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Expense Dashboard</h1>
+    <h2>Total Spending: ${{ "%.2f"|format(total_spent) }}</h2>
+    <h2>Average Daily Spending: ${{ "%.2f"|format(avg_daily) }}</h2>
+
+    <h2>Spending by Description</h2>
+    <table>
+        <tr>
+            <th>Description</th>
+            <th>Amount ($)</th>
+        </tr>
+        {% for desc, amt in spending_by_desc.items() %}
+        <tr>
+            <td>{{ desc }}</td>
+            <td>{{ "%.2f"|format(amt) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Spending by Day</h2>
+    <table>
+        <tr>
+            <th>Date</th>
+            <th>Amount ($)</th>
+        </tr>
+        {% for date, amt in spending_by_day.items() %}
+        <tr>
+            <td>{{ date }}</td>
+            <td>{{ "%.2f"|format(amt) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+
+</html>

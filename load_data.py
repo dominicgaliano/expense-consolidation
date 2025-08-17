@@ -18,16 +18,15 @@ SHEET_URLS_TXT_FILE = "cached_sheet_urls.txt"
 
 # --- Logging setup ---
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
 
 def getSheetUrls(from_cache: bool = False) -> List[str]:
     def writeSheetUrlsToCache(sheet_urls: List[str]) -> None:
-      with open(SHEET_URLS_TXT_FILE, mode = 'w') as file:
-        file.writelines([url+'\n' for url in sheet_urls])
-      logging.info(f"Wrote {len(sheet_urls)} to cache file: {SHEET_URLS_TXT_FILE}")
+        with open(SHEET_URLS_TXT_FILE, mode="w") as file:
+            file.writelines([url + "\n" for url in sheet_urls])
+        logging.info(f"Wrote {len(sheet_urls)} to cache file: {SHEET_URLS_TXT_FILE}")
 
     def getSheetUrlsFromCache() -> List[str]:
         logging.info(f"Using cached sheet urls")
@@ -35,7 +34,6 @@ def getSheetUrls(from_cache: bool = False) -> List[str]:
         sheet_urls = []
         with open(SHEET_URLS_TXT_FILE) as file:
             sheet_urls = [line.rstrip() for line in file]
-
 
         logging.info(f"Total sheets found: {len(sheet_urls)}")
         return sheet_urls
@@ -45,11 +43,11 @@ def getSheetUrls(from_cache: bool = False) -> List[str]:
 
     scopes = ["https://www.googleapis.com/auth/drive.readonly"]
     creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
-    service = build('drive', 'v3', credentials=creds)
+    service = build("drive", "v3", credentials=creds)
 
     query = f"'{FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
     results = service.files().list(q=query, fields="files(id, name)").execute()
-    files = results.get('files', [])
+    files = results.get("files", [])
 
     sheet_urls = []
     for f in files:
@@ -111,7 +109,9 @@ def parseSheets(sheet_urls: List[str]) -> None:
             df = df.drop(columns=["Amount"])
 
             # Check integer type
-            assert pd.api.types.is_integer_dtype(df["amountCents"]), "amountCents not integer type"
+            assert pd.api.types.is_integer_dtype(
+                df["amountCents"]
+            ), "amountCents not integer type"
 
             logging.info(f"Parsed {len(df)} rows from {url}")
             all_expenses.append(df)
@@ -119,7 +119,9 @@ def parseSheets(sheet_urls: List[str]) -> None:
 
         except AssertionError as e:
             logging.error(f"Assertion failed for {url}: {e}")
-            summary_data.append({"sheet_url": url, "rows": 0, "status": f"Assertion failed: {e}"})
+            summary_data.append(
+                {"sheet_url": url, "rows": 0, "status": f"Assertion failed: {e}"}
+            )
         except Exception as e:
             logging.exception(f"Unexpected error processing {url}")
             summary_data.append({"sheet_url": url, "rows": 0, "status": f"Error: {e}"})
@@ -128,35 +130,33 @@ def parseSheets(sheet_urls: List[str]) -> None:
     if all_expenses:
         combined_df = pd.concat(all_expenses, ignore_index=True)
         combined_df.to_csv(COMBINED_CSV, index=False)
-        logging.info(f"Saved combined expenses to {COMBINED_CSV} with {len(combined_df)} total rows")
+        logging.info(
+            f"Saved combined expenses to {COMBINED_CSV} with {len(combined_df)} total rows"
+        )
     else:
         logging.warning("No expenses compiled.")
 
     print(summary_data)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--from-cache",
-        help = "Use cached sheets list",
-        action="store_true"
+        "--from-cache", help="Use cached sheets list", action="store_true"
     )
     parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set the logging level (default: INFO)"
+        help="Set the logging level (default: INFO)",
     )
     args = parser.parse_args()
     logging.getLogger().setLevel(getattr(logging, args.log_level.upper()))
     logging.debug(f"Log level set to {args.log_level.upper()}")
-    
 
     sheet_urls = getSheetUrls(args.from_cache)
     parseSheets(sheet_urls)
 
+
 if __name__ == "__main__":
     main()
-
-
-

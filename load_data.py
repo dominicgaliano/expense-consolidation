@@ -13,7 +13,8 @@ import argparse
 load_dotenv()
 FOLDER_ID = os.environ["FOLDER_ID"]
 CREDENTIALS_FILE = "credentials.json"
-COMBINED_CSV = "combined_expenses.csv"
+OUTPUT_DIR = "./output"
+OUTPUT_FILE_NAME = "combined_expenses.csv"
 SUMMARY_CSV = "sheet_summary.csv"
 SHEET_URLS_TXT_FILE = "cached_sheet_urls.txt"
 
@@ -80,9 +81,15 @@ class SheetsParser:
         # Combine all sheets
         if self.all_expenses:
             combined_df = pd.concat(self.all_expenses, ignore_index=True)
-            combined_df.to_csv(COMBINED_CSV, index=False)
+
+            if not os.path.exists(OUTPUT_DIR):
+                os.mkdir(OUTPUT_DIR)
+
+            file_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE_NAME)
+
+            combined_df.to_csv(file_path, index=False)
             logging.info(
-                f"Saved combined expenses to {COMBINED_CSV} with {len(combined_df)} total rows"
+                f"Saved combined expenses to {file_path} with {len(combined_df)} total rows"
             )
         else:
             logging.warning("No expenses compiled.")

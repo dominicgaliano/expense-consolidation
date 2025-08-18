@@ -2,6 +2,7 @@
 /output/
 credentials.json
 cached_sheet_urls.txt
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

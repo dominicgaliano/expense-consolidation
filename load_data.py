@@ -61,7 +61,11 @@ def getSheetUrls(from_cache: bool = False) -> List[str]:
 
 
 def parseSheets(sheet_urls: List[str]) -> None:
-    gc = gspread.service_account(filename=CREDENTIALS_FILE)
+    gc = gspread.service_account(
+        filename=CREDENTIALS_FILE, http_client=gspread.BackOffHTTPClient
+    )
+    gc.http_client._MAX_BACKOFF = 10
+
     all_expenses = []
     summary_data = []
 

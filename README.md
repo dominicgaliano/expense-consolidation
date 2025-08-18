@@ -3,6 +3,7 @@
 TODO:
 
 - better reporting
+- add regex filter to data reader
 
 COMPLETE:
 

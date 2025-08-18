@@ -3,6 +3,7 @@
 
 <head>
     <title>Expense Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,21 +15,10 @@
             color: #333;
         }
 
-        table {
-            border-collapse: collapse;
-            width: 50%;
-            margin-bottom: 20px;
-        }
-
-        th,
-        td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            text-align: left;
-        }
-
-        th {
-            background-color: #f4f4f4;
+        #chart-container {
+            width: 80%;
+            max-width: 800px;
+            margin-top: 40px;
         }
     </style>
 </head>
@@ -36,35 +26,39 @@
 <body>
     <h1>Expense Dashboard</h1>
     <h2>Total Spending: ${{ "%.2f"|format(total_spent) }}</h2>
-    <h2>Average Daily Spending: ${{ "%.2f"|format(avg_daily) }}</h2>
 
-    <h2>Spending by Description</h2>
-    <table>
-        <tr>
-            <th>Description</th>
-            <th>Amount ($)</th>
-        </tr>
-        {% for desc, amt in spending_by_desc.items() %}
-        <tr>
-            <td>{{ desc }}</td>
-            <td>{{ "%.2f"|format(amt) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+    <div id="chart-container">
+        <canvas id="spendingChart"></canvas>
+    </div>
 
-    <h2>Spending by Day</h2>
-    <table>
-        <tr>
-            <th>Date</th>
-            <th>Amount ($)</th>
-        </tr>
-        {% for date, amt in spending_by_day.items() %}
-        <tr>
-            <td>{{ date }}</td>
-            <td>{{ "%.2f"|format(amt) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+    <script>
+        const ctx = document.getElementById('spendingChart').getContext('2d');
+        const spendingData = {
+            labels: {{spending_by_month.keys() | list | tojson }},
+        datasets: [{
+            label: 'Spending ($)',
+            data: {{spending_by_month.values() | list | tojson}},
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+            }]
+        };
+
+        const config = {
+            type: 'bar',
+            data: spendingData,
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        };
+
+        new Chart(ctx, config);
+    </script>
 </body>
 
 </html>

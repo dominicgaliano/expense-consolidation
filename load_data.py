@@ -1,10 +1,11 @@
+import pprint
 import os
 from dotenv import load_dotenv
 import pandas as pd
 import gspread
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
-from typing import List
+from typing import List, Dict, Any
 import logging
 import argparse
 
@@ -60,19 +61,38 @@ def getSheetUrls(from_cache: bool = False) -> List[str]:
     return sheet_urls
 
 
-def parseSheets(sheet_urls: List[str]) -> None:
-    gc = gspread.service_account(
-        filename=CREDENTIALS_FILE, http_client=gspread.BackOffHTTPClient
-    )
-    gc.http_client._MAX_BACKOFF = 10
+class SheetsParser:
+    def __init__(self, credentials_file: str):
+        self.gc = gspread.service_account(
+            filename=credentials_file, http_client=gspread.BackOffHTTPClient
+        )
+        self.gc.http_client._MAX_BACKOFF = 10
+        self.all_expenses: List[pd.DataFrame] = []
+        self.summary_data: List[Dict[str, Any]] = []
 
-    all_expenses = []
-    summary_data = []
+    def parseSheets(self, sheet_urls: List[str]) -> None:
+        for url in sheet_urls:
+            result = self._parseSingleSheet(url)
+            if result["rows"] > 0 and "df" in result:
+                self.all_expenses.append(result["df"])
+            self.summary_data.append({k: v for k, v in result.items() if k != "df"})
 
-    for url in sheet_urls:
+        # Combine all sheets
+        if self.all_expenses:
+            combined_df = pd.concat(self.all_expenses, ignore_index=True)
+            combined_df.to_csv(COMBINED_CSV, index=False)
+            logging.info(
+                f"Saved combined expenses to {COMBINED_CSV} with {len(combined_df)} total rows"
+            )
+        else:
+            logging.warning("No expenses compiled.")
+
+        pprint.pp(self.summary_data)
+
+    def _parseSingleSheet(self, url: str) -> Dict[str, Any]:
         try:
             logging.info(f"Processing sheet: {url}")
-            sh = gc.open_by_url(url)
+            sh = self.gc.open_by_url(url)
 
             # Ensure 'Expenses' tab exists
             worksheets = [ws.title for ws in sh.worksheets()]
@@ -80,8 +100,6 @@ def parseSheets(sheet_urls: List[str]) -> None:
 
             ws = sh.worksheet("Expenses")
             rows = ws.get_all_values()
-
-            # Ensure non-empty data
             assert rows, "No data found"
 
             header, data = rows[0], rows[1:]
@@ -103,8 +121,9 @@ def parseSheets(sheet_urls: List[str]) -> None:
             # Convert Amount → amountCents
             df["amountCents"] = (
                 df["Amount"]
-                .str.replace(r"[,\$]", "", regex=True)
-                .str.replace(r"\((.*?)\)", r"-\1", regex=True)
+                .str.replace(r"[,\$]", "", regex=True)  # remove $ and ,
+                .replace("", "0")
+                .fillna("0")
                 .astype(float)
                 .mul(100)
                 .round()
@@ -112,35 +131,19 @@ def parseSheets(sheet_urls: List[str]) -> None:
             )
             df = df.drop(columns=["Amount"])
 
-            # Check integer type
             assert pd.api.types.is_integer_dtype(
                 df["amountCents"]
             ), "amountCents not integer type"
 
             logging.info(f"Parsed {len(df)} rows from {url}")
-            all_expenses.append(df)
-            summary_data.append({"sheet_url": url, "rows": len(df), "status": "OK"})
+            return {"sheet_url": url, "rows": len(df), "status": "OK", "df": df}
 
         except AssertionError as e:
             logging.error(f"Assertion failed for {url}: {e}")
-            summary_data.append(
-                {"sheet_url": url, "rows": 0, "status": f"Assertion failed: {e}"}
-            )
+            return {"sheet_url": url, "rows": 0, "status": f"Assertion failed: {e}"}
         except Exception as e:
             logging.exception(f"Unexpected error processing {url}")
-            summary_data.append({"sheet_url": url, "rows": 0, "status": f"Error: {e}"})
-
-    # Combine all sheets
-    if all_expenses:
-        combined_df = pd.concat(all_expenses, ignore_index=True)
-        combined_df.to_csv(COMBINED_CSV, index=False)
-        logging.info(
-            f"Saved combined expenses to {COMBINED_CSV} with {len(combined_df)} total rows"
-        )
-    else:
-        logging.warning("No expenses compiled.")
-
-    print(summary_data)
+            return {"sheet_url": url, "rows": 0, "status": f"Error: {e}"}
 
 
 def main():
@@ -154,12 +157,22 @@ def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level (default: INFO)",
     )
+    parser.add_argument(
+        "--sheet-url",
+        help="Process only a single sheet by URL (overrides --from-cache and Drive lookup)",
+    )
     args = parser.parse_args()
     logging.getLogger().setLevel(getattr(logging, args.log_level.upper()))
     logging.debug(f"Log level set to {args.log_level.upper()}")
 
-    sheet_urls = getSheetUrls(args.from_cache)
-    parseSheets(sheet_urls)
+    if args.sheet_url:
+        sheet_urls = [args.sheet_url]
+        logging.info(f"Processing only single sheet: {args.sheet_url}")
+    else:
+        sheet_urls = getSheetUrls(args.from_cache)
+
+    parser = SheetsParser(CREDENTIALS_FILE)
+    parser.parseSheets(sheet_urls)
 
 
 if __name__ == "__main__":

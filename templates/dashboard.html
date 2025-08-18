@@ -20,6 +20,14 @@
             max-width: 800px;
             margin-top: 40px;
         }
+
+        .filter-container {
+            margin-top: 20px;
+        }
+
+        .filter-container label {
+            margin-right: 10px;
+        }
     </style>
 </head>
 
@@ -27,37 +35,74 @@
     <h1>Expense Dashboard</h1>
     <h2>Total Spending: ${{ "%.2f"|format(total_spent) }}</h2>
 
+    <div class="filter-container">
+        <label for="startDate">Start Month:</label>
+        <input type="month" id="startDate">
+
+        <label for="endDate">End Month:</label>
+        <input type="month" id="endDate">
+
+        <button id="applyFilter">Apply Filter</button>
+    </div>
+
     <div id="chart-container">
         <canvas id="spendingChart"></canvas>
     </div>
 
     <script>
         const ctx = document.getElementById('spendingChart').getContext('2d');
-        const spendingData = {
-            labels: {{spending_by_month.keys() | list | tojson }},
-        datasets: [{
-            label: 'Spending ($)',
-            data: {{spending_by_month.values() | list | tojson}},
-            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 1
-            }]
-        };
+        const rawLabels = {{spending_by_month.keys() | list | tojson }};
+        const rawData = {{spending_by_month.values() | list | tojson }};
 
-        const config = {
-            type: 'bar',
-            data: spendingData,
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
+        let spendingChart;
+
+        function renderChart(labels, data) {
+            if (spendingChart) {
+                spendingChart.destroy();
+            }
+
+            spendingChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Spending ($)',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        };
+            });
+        }
 
-        new Chart(ctx, config);
+        // initial chart
+        renderChart(rawLabels, rawData);
+
+        document.getElementById('applyFilter').addEventListener('click', () => {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            const filteredLabels = [];
+            const filteredData = [];
+
+            rawLabels.forEach((month, index) => {
+                if ((!start || month >= start) && (!end || month <= end)) {
+                    filteredLabels.push(month);
+                    filteredData.push(rawData[index]);
+                }
+            });
+
+            renderChart(filteredLabels, filteredData);
+        });
     </script>
 </body>
 

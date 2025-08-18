@@ -1,4 +1,5 @@
 import pprint
+import re
 import os
 from dotenv import load_dotenv
 import pandas as pd
@@ -63,13 +64,14 @@ def getSheetUrls(from_cache: bool = False) -> List[str]:
 
 
 class SheetsParser:
-    def __init__(self, credentials_file: str):
+    def __init__(self, credentials_file: str, exclude_regex: str = None):
         self.gc = gspread.service_account(
             filename=credentials_file, http_client=gspread.BackOffHTTPClient
         )
         self.gc.http_client._MAX_BACKOFF = 10
         self.all_expenses: List[pd.DataFrame] = []
         self.summary_data: List[Dict[str, Any]] = []
+        self.exclude_regex = re.compile(exclude_regex) if exclude_regex else None
 
     def parseSheets(self, sheet_urls: List[str]) -> None:
         for url in sheet_urls:
@@ -125,6 +127,17 @@ class SheetsParser:
                 logging.info("Dropping 'Accounted' column")
                 df = df.drop(columns=["Accounted"])
 
+            # Apply exclude regex if given
+            if self.exclude_regex is not None:
+                mask = df["Description"].str.contains(
+                    self.exclude_regex, regex=True, na=False
+                )
+                for dropped_row in df[mask].to_dict(orient="records"):
+                    logging.info(
+                        f"Dropping row with description matching regex: {dropped_row}"
+                    )
+                df = df[~mask]
+
             # Convert Amount → amountCents
             df["amountCents"] = (
                 df["Amount"]
@@ -168,6 +181,10 @@ def main():
         "--sheet-url",
         help="Process only a single sheet by URL (overrides --from-cache and Drive lookup)",
     )
+    parser.add_argument(
+        "--exclude-regex",
+        help="Regex to exclude rows based on Description column",
+    )
     args = parser.parse_args()
     logging.getLogger().setLevel(getattr(logging, args.log_level.upper()))
     logging.debug(f"Log level set to {args.log_level.upper()}")
@@ -178,7 +195,7 @@ def main():
     else:
         sheet_urls = getSheetUrls(args.from_cache)
 
-    parser = SheetsParser(CREDENTIALS_FILE)
+    parser = SheetsParser(CREDENTIALS_FILE, exclude_regex=args.exclude_regex)
     parser.parseSheets(sheet_urls)
 
 

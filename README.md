@@ -3,7 +3,6 @@
 TODO:
 
 - better reporting
-- add regex filter to data reader
 
 COMPLETE:
 
@@ -11,6 +10,8 @@ COMPLETE:
 - add rate limiting so that reads fit within quota
 - dynamically parse only files that didn't have failures
   - implemented method to parse a single file
+- add regex filter to data reader
+  - example usage: `python3 load_data.py --from-cache --exclude-regex '(?i)investment'`
 
 ## Rate Limits
 

@@ -37,10 +37,20 @@
 
     <div class="filter-container">
         <label for="startDate">Start Month:</label>
-        <input type="month" id="startDate">
+        <select id="startDate">
+            <option value="">All</option>
+            {% for month in available_months %}
+            <option value="{{ month }}">{{ month }}</option>
+            {% endfor %}
+        </select>
 
         <label for="endDate">End Month:</label>
-        <input type="month" id="endDate">
+        <select id="endDate">
+            <option value="">All</option>
+            {% for month in available_months %}
+            <option value="{{ month }}">{{ month }}</option>
+            {% endfor %}
+        </select>
 
         <button id="applyFilter">Apply Filter</button>
     </div>
@@ -48,6 +58,82 @@
     <div id="chart-container">
         <canvas id="spendingChart"></canvas>
     </div>
+
+
+    <hr style="margin: 40px 0;">
+
+    <h2>View Expenses by Month</h2>
+
+    <div class="filter-container">
+        <label for="expenseMonth">Select Month:</label>
+        <select id="expenseMonth">
+            <option value="">-- Select a month --</option>
+            {% for month in available_months %}
+            <option value="{{ month }}">{{ month }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div id="expenses-container">
+        <p id="no-data-message">Select a month to view expenses.</p>
+        <table id="expenses-table" style="display: none; border-collapse: collapse; width: 80%; margin-top: 20px;">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="text-align: left; padding: 8px;">Date</th>
+                    <th style="text-align: left; padding: 8px;">Description</th>
+                    <th style="text-align: right; padding: 8px;">Amount ($)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+                <tr style="font-weight: bold; background-color: #f9f9f9;">
+                    <td colspan="2" style="padding: 8px; text-align: right;">Total:</td>
+                    <td id="total-amount" style="padding: 8px; text-align: right;">$0.00</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <script>
+        const startSelect = document.getElementById('startDate');
+        const endSelect = document.getElementById('endDate');
+
+        // Keep a copy of all available months for filtering logic
+        const allMonths = Array.from(startSelect.options).slice(1).map(opt => opt.value);
+
+        // When start month changes, filter end month options
+        startSelect.addEventListener('change', () => {
+            const startValue = startSelect.value;
+
+            const filtered = startValue
+                ? allMonths.filter(month => month >= startValue)
+                : allMonths;
+
+            filtered.forEach(month => {
+                const opt = document.createElement('option');
+                opt.value = month;
+                opt.textContent = month;
+                endSelect.appendChild(opt);
+            });
+        });
+
+        // (Optional) When end month changes, filter start month options to <= end endSelect.addEventListener('change', ()=>
+        {
+            const endValue = endSelect.value;
+
+            // Reset start month dropdown
+            startSelect.innerHTML = '<option value="">All</option>';
+
+            const filtered = endValue
+                ? allMonths.filter(month => month <= endValue) : allMonths; filtered.forEach(month => {
+                    const opt = document.createElement('option');
+                    opt.value = month;
+                    opt.textContent = month;
+                    startSelect.appendChild(opt);
+                });
+        });
+    </script>
+
 
     <script>
         const ctx = document.getElementById('spendingChart').getContext('2d');
@@ -104,6 +190,68 @@
             renderChart(filteredLabels, filteredData);
         });
     </script>
+
+    <script>
+        const expenseMonthSelect = document.getElementById("expenseMonth");
+        const expensesTable = document.getElementById("expenses-table");
+        const expensesBody = expensesTable.querySelector("tbody");
+        const totalAmountCell = document.getElementById("total-amount");
+        const noDataMessage = document.getElementById("no-data-message");
+
+        async function loadExpensesForMonth(month) {
+            if (!month) {
+                expensesTable.style.display = "none";
+                noDataMessage.textContent = "Select a month to view expenses.";
+                noDataMessage.style.display = "block";
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/expenses/${month}`);
+                const data = await res.json();
+
+                if (data.error || data.length === 0) {
+                    expensesTable.style.display = "none";
+                    noDataMessage.textContent = "No expenses found for this month.";
+                    noDataMessage.style.display = "block";
+                    return;
+                }
+
+                noDataMessage.style.display = "none";
+                expensesTable.style.display = "table";
+
+                expensesBody.innerHTML = "";
+                let total = 0;
+
+                data.forEach(exp => {
+                    total += exp.amountDollars
+
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                <td style="padding: 8px;">${exp.Date}</td>
+                <td style="padding: 8px;">${exp.Description}</td>
+                <td style="text-align: right; padding: 8px;">${exp.amountDollars.toFixed(2)}</td>
+            `;
+                    expensesBody.appendChild(row);
+                });
+
+                totalAmountCell.textContent = `$${total.toFixed(2)}`;
+
+
+            } catch (err) {
+                noDataMessage.textContent = "Error loading expenses.";
+                expensesTable.style.display = "none";
+                noDataMessage.style.display = "block";
+            }
+        }
+
+        // Load data when month changes
+        expenseMonthSelect.addEventListener("change", () => {
+            const selectedMonth = expenseMonthSelect.value;
+            loadExpensesForMonth(selectedMonth);
+        });
+    </script>
+
 </body>
 
 </html>
